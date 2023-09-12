@@ -21,6 +21,21 @@ fn main() {
     } // r1 在这里离开了作用域，所以我们完全可以创建一个新的引用
 
     let _r2 = &mut str;
+
+    // --------------------------------------------
+
+    let mut a = 1;
+    let mut b = 2;
+
+    let mut r1 = &a;
+    println!("r1: {}", r1);
+    r1 = &b;
+    println!("r1: {}", r1);
+
+    let mut r2 = &mut a;
+    println!("r2: {}", r2);
+    r2 = &mut b;
+    println!("r2: {}", r2);
 }
 
 fn calculate_length(s: &String) -> usize {
