@@ -8,7 +8,11 @@
     1. [Function](#function)
     1. [Ownership](#ownership)
     1. [Reference & Borrow](#reference--borrowing)
-    1. [Compound Type](#compound-type)
+    1. [String & Slice](#string--slice)
+    1. [Tuple](#tuple)
+    1. [Struct](#struct)
+    1. [Enum](#enum)
+    1. [Array](#array)
 1. [Exercises](#exercises)
 
 ## Notes
@@ -282,22 +286,341 @@ Rust 的编译器一直在优化，早期的时候，引用的作用域跟变量
     ```
 1. 悬垂引用(Dangling References): 意思为指针指向某个值后，这个值被释放掉了，而指针仍然存在。在 Rust 中**编译器可以确保引用永远也不会变成悬垂状态**，当你获取数据的引用后，**编译器可以确保数据不会在引用结束前被释放(或者被移动)，要想释放数据，必须先停止其引用的使用**，Rust 编译器通过分析生命周期来保证引用总是有效的。
 
-### Compound Type
+### String & Slice
 
 1. #![allow(unused_variables)] 属性标记，该标记会告诉编译器忽略未使用的变量，不要抛出 warning 警告。
 1. unimplemented!() 告诉编译器该函数尚未实现，unimplemented!() 标记通常意味着我们期望快速完成主要代码，回头再通过搜索这些标记来完成次要代码，类似的标记还有 todo!()，当代码执行到这种未实现的地方时，程序会直接报错。
 1. 切片：使用方括号包括的一个序列，[开始索引..终止索引]，其中开始索引是切片中第一个元素的索引位置，而终止索引是最后一个元素后面的索引位置，也就是**左闭右开**区间。在**切片数据结构内部会保存开始的位置和切片的长度**，其中长度是通过终止索引 - 开始索引的方式计算得来的。
 1. 如果你的切片想要包含 String 的最后一个字节，则可以这样使用 [idx..]，不写终止索引，同理还存在 [..idx] 甚至 [..] 的形式。
-1. 在对字符串使用切片语法时需要格外小心，切片的索引必须落在字符串字符之间的边界位置，也就是 UTF-8 字符的边界(**Rust 中的字符是 Unicode 类型每个字符占据 4 个字节内存空间，但是在字符串中字符串是 UTF-8 编码，这样可以减少所占空间**)，例如中文在 UTF-8 中占用三个字节，下面的代码就会崩溃：
+1. 字符串中的一个字符这里指 "a啊の" 这里能选中的最小单元，比如 'a'，'啊'，'の' 这就是三个字符。
+1. 在对字符串使用切片语法时需要格外小心，切片的索引必须落在字符之间的边界位置(**Rust 中的 char 是 Unicode 类型每个字符占据 4 个字节内存空间，但是在字符串中字符串是 UTF-8 编码，这样可以减少所占空间**)，例如中文在 UTF-8 中占用三个字节，下面的代码就会崩溃：
     ```rust
     let s = "中国人";
     let a = &s[0..2];
     println!("{}",a);
     ```
-    因为我们只取 s 字符串的前两个字节，但是本例中每个汉字占用三个字节，因此没有落在边界处，也就是连'中'字都取不完整，此时程序会直接崩溃退出，如果改成 &s[0..3]，则可以正常通过编译。
+    因为我们只取 s 字符串的前两个字节，但是本例中每个汉字占用三个字节，因此没有落在字符的边界处，也就是连第一个字符'中'字都取不完整，此时程序会直接崩溃退出，如果改成 &s[0..3]，则可以正常通过编译。
 1. 字符串切片的类型标识是 &str，也是字符串字面值的类型。
 1. Rust 在语言级别，只有一种字符串类型： str，它通常是以引用类型出现 &str，也就是上文提到的字符串切片。但是在标准库里，还有多种不同用途的字符串类型，其中使用最广的即是 String 类型。  
 str 类型是硬编码进可执行文件，也无法被修改，但是 String 则是一个可增长、可改变且**具有所有权**的 UTF-8 编码字符串，当 Rust 用户提到字符串时，往往指的就是 String 类型和 &str 字符串切片类型，这两个类型都是 UTF-8 编码。
+1. 如何将 String 类型转为 &str 类型，取引用即可，这种灵活用法是因为 deref 隐式强制转换，或者使用 as_str() 函数。<!-- TODO -->
+    ```rust
+    fn main() {
+        let s = String::from("hello,world!");
+        say_hello(&s);
+        say_hello(&s[..]);
+        say_hello(s.as_str());
+    }
+
+    fn say_hello(s: &str) {
+        println!("{}",s);
+    }
+    ```
+1. 在其它语言中，使用索引的方式访问字符串的某个字符或者子串是很正常的行为，但是在 Rust 中就会报错：
+    ```rust
+    let s1 = String::from("hello");
+    let h = s1[0];
+
+    3 |     let h = s1[0];
+    |             ^^^^^ `String` cannot be indexed by `{integer}`
+    |
+    = help: the trait `Index<{integer}>` is not implemented for `String`
+    ```
+    这首先是因为一个字符可能占有多个字节；第二是索引操作，我们总是期望它的性能表现是 O(1)，然而对于 String 类型来说，无法保证这一点，因为 Rust 可能需要从 0 开始去遍历字符串来定位合法的字符降低效率。
+1. 字符串切片是非常危险的操作，因为**切片的索引是通过字节来进行，所以索引也要在字符的边界上**：
+    ```rust
+    let hello = "中国人";
+    let s = &hello[0..2];
+    // 运行上面的程序，会直接造成崩溃：
+    thread 'main' panicked at 'byte index 2 is not a char boundary; it is inside '中' (bytes 0..3) of `中国人`, src/main.rs:4:14
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    // 这里提示的很清楚，我们索引的字节落在了'中'字符的内部，这种返回没有任何意义。
+    ```
+1. 无法使用 Index<{integer}> 索引字符串字符，那么该如何遍历一个 String 呢？这可以通过 **chars() 和 bytes() 函数分别对字符串使用字符和字节的形式进行遍历**。chars() 会以 Unicode 字符的方式遍历字符串；bytes() 以返回字符串的底层字节数组的方式遍历字符串。
+```rust
+for c in "中国人".chars() {
+    println!("{}", c);
+}
+
+// output:
+// 中
+// 国
+// 人
+
+for b in "中国人".bytes() {
+    println!("{}", b);
+}
+
+// output:
+// 228
+// 184
+// 173
+// 229
+// 155
+// 189
+// 228
+// 186
+// 186
+```
+1. 可以通过使用 '\' 输出 ASCII 和 Unicode 字符来进行转义，'\\\\' 相当于 '\\'，另外可以通过 r#"something ..."# 来创建原始字符串字面量（raw string literals）允许在字符串中包含特殊字符（比如反斜杠'\\'）而无需进行转义。
+
 1. 
+连接 (Concatenate)
+1、使用 + 或者 += 连接字符串
+
+使用 + 或者 += 连接字符串，要求右边的参数必须为字符串的切片引用（Slice）类型。其实当调用 + 的操作符时，相当于调用了 std::string 标准库中的 add() 方法，这里 add() 方法的第二个参数是一个引用的类型。因此我们在使用 +， 必须传递切片引用类型。不能直接传递 String 类型。+ 是返回一个新的字符串，所以变量声明可以不需要 mut 关键字修饰。
+
+示例代码如下：
+
+fn main() {
+    let string_append = String::from("hello ");
+    let string_rust = String::from("rust");
+    // &string_rust会自动解引用为&str
+    let result = string_append + &string_rust;
+    let mut result = result + "!"; // `result + "!"` 中的 `result` 是不可变的
+    result += "!!!";
+
+    println!("连接字符串 + -> {}", result);
+}
+代码运行结果：
+
+连接字符串 + -> hello rust!!!!
+add() 方法的定义：
+
+fn add(self, s: &str) -> String
+因为该方法涉及到更复杂的特征功能，因此我们这里简单说明下：
+
+fn main() {
+    let s1 = String::from("hello,");
+    let s2 = String::from("world!");
+    // 在下句中，s1的所有权被转移走了，因此后面不能再使用s1
+    let s3 = s1 + &s2;
+    assert_eq!(s3,"hello,world!");
+    // 下面的语句如果去掉注释，就会报错
+    // println!("{}",s1);
+}
+self 是 String 类型的字符串 s1，该函数说明，只能将 &str 类型的字符串切片添加到 String 类型的 s1 上，然后返回一个新的 String 类型，所以 let s3 = s1 + &s2; 就很好解释了，将 String 类型的 s1 与 &str 类型的 s2 进行相加，最终得到 String 类型的 s3。
+
+由此可推，以下代码也是合法的：
+
+let s1 = String::from("tic");
+let s2 = String::from("tac");
+let s3 = String::from("toe");
+
+// String = String + &str + &str + &str + &str
+let s = s1 + "-" + &s2 + "-" + &s3;
+String + &str返回一个 String，然后再继续跟一个 &str 进行 + 操作，返回一个 String 类型，不断循环，最终生成一个 s，也是 String 类型。
+
+s1 这个变量通过调用 add() 方法后，所有权被转移到 add() 方法里面， add() 方法调用后就被释放了，同时 s1 也被释放了。再使用 s1 就会发生错误。这里涉及到所有权转移（Move）的相关知识。
+
+2、使用 format! 连接字符串
+
+format! 这种方式适用于 String 和 &str 。format! 的用法与 print! 的用法类似，详见格式化输出。
+
+示例代码如下：
+
+fn main() {
+    let s1 = "hello";
+    let s2 = String::from("rust");
+    let s = format!("{} {}!", s1, s2);
+    println!("{}", s);
+}
+代码运行结果：
+
+hello rust!
+
+
+1. 字符串深度剖析
+那么问题来了，为啥 String 可变，而字符串字面值 str 却不可以？
+
+就字符串字面值来说，我们在编译时就知道其内容，最终字面值文本被直接硬编码进可执行文件中，这使得字符串字面值快速且高效，这主要得益于字符串字面值的不可变性。不幸的是，我们不能为了获得这种性能，而把每一个在编译时大小未知的文本都放进内存中（你也做不到！），因为有的字符串是在程序运行得过程中动态生成的。
+
+对于 String 类型，为了支持一个可变、可增长的文本片段，需要在堆上分配一块在编译时未知大小的内存来存放内容，这些都是在程序运行时完成的：
+
+首先向操作系统请求内存来存放 String 对象
+在使用完成后，将内存释放，归还给操作系统
+其中第一部分由 String::from 完成，它创建了一个全新的 String。
+
+重点来了，到了第二部分，就是百家齐放的环节，在有垃圾回收 GC 的语言中，GC 来负责标记并清除这些不再使用的内存对象，这个过程都是自动完成，无需开发者关心，非常简单好用；但是在无 GC 的语言中，需要开发者手动去释放这些内存对象，就像创建对象需要通过编写代码来完成一样，未能正确释放对象造成的后果简直不可估量。
+
+对于 Rust 而言，安全和性能是写到骨子里的核心特性，如果使用 GC，那么会牺牲性能；如果使用手动管理内存，那么会牺牲安全，这该怎么办？为此，Rust 的开发者想出了一个无比惊艳的办法：变量在离开作用域后，就自动释放其占用的内存：
+
+{
+    let s = String::from("hello"); // 从此处起，s 是有效的
+
+    // 使用 s
+}                                  // 此作用域已结束，
+                                   // s 不再有效，内存被释放
+与其它系统编程语言的 free 函数相同，Rust 也提供了一个释放内存的函数： drop，但是不同的是，其它语言要手动调用 free 来释放每一个变量占用的内存，而 Rust 则在变量离开作用域时，自动调用 drop 函数: 上面代码中，Rust 在结尾的 } 处自动调用 drop。
+
+其实，在 C++ 中，也有这种概念: Resource Acquisition Is Initialization (RAII)。如果你使用过 RAII 模式的话应该对 Rust 的 drop 函数并不陌生。
+
+这个模式对编写 Rust 代码的方式有着深远的影响，在后面章节我们会进行更深入的介绍。
+
+### Tuple
+
+1. 元组是由多个类型（可以不同）组合到一起形成的，因此它是复合类型，元组的长度是固定的，元组中元素的顺序也是固定的，可以使用模式匹配或者 . 操作符来获取元组中的值。
+1. 用**模式匹配来解构**（解构：用和对象的相同的形式把复杂对象中的值匹配出来）元组，依次把对应位置的值绑定到变量。
+    ```rust
+    fn main() {
+        let tup = (500, 6.4, 1);
+        let (x, y, z) = tup;
+    }
+    ```
+1. 模式匹配可以让我们一次性把元组中的值全部或者部分获取出来，如果只想要访问某个特定元素，那模式匹配就略显繁琐，可以**使用 . 访问，元组的索引也从 0 开始**。
+    ```rust
+    fn main() {
+        let x: (i32, f64, u8) = (500, 6.4, 1);
+
+        let a = x.0;
+        let b = x.1;
+        let c = x.2;
+    }
+    ```
+1. 元组一个非常常见的使用场景就是**函数利用元组返回多个值**。
+    ```rust
+    fn calculate_length(s: String) -> (String, usize) {
+        let length = s.len();
+        (s, length)
+    }
+
+    fn main() {
+        let s1 = String::from("hello");
+        let (s2, len) = calculate_length(s1);
+        println!("The length of '{}' is {}.", s2, len);
+    }
+    ```
+
+### Struct
+
+### Enum
+
+1. 可以将数据关联到枚举成员上，而避免写 Struct，而且同一个枚举类型下的不同成员还能持有不同的数据类型。
+```rust
+enum PokerCard {
+    Clubs(u8),
+    Spades(u8),
+    Diamonds(u8),
+    Hearts(u8),
+}
+
+fn main() {
+   let c1 = PokerCard::Spades(5);
+   let c2 = PokerCard::Diamonds(13);
+}
+
+// 同一个枚举类型下的不同成员可以持有不同的数据类型
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+
+fn main() {
+    let m1 = Message::Quit;
+    let m2 = Message::Move{x:1,y:1};
+    let m3 = Message::ChangeColor(255,255,0);
+}
+```
+1. 任何类型的数据都可以放入枚举成员中: 例如字符串、数值、元组、结构体、匿名结构体甚至另一个枚举。
+1. 例如某个函数它的功能是接受消息并进行发送，那么用枚举的方式，让函数接受的参数是一个枚举类型，该枚举类型包含着许多可能的消息类型，就可以通过一个参数接收不同类型的消息，可以实现多态。
+```rust
+struct AContent {
+    val: u32,
+}
+
+struct BContent {
+    val: u32,
+}
+
+enum MessageContent {
+    Message1(AContent),
+    Message2(BContent),
+}
+
+struct Message {
+    msg_id: u32,
+    content: MessageContent,
+}
+
+fn func(msg: Message) {
+    let content = msg.content;
+    match content {
+        MessageContent::Message1(a_content) => {
+            println!("Message type1: {} - {}", msg.msg_id, a_content.val)
+        }
+        MessageContent::Message2(b_content) => {
+            println!("Message type2: {} - {}", msg.msg_id, b_content.val)
+        }
+    }
+}
+fn main() {
+    let msg = Message {
+        msg_id: 1,
+        content: MessageContent::Message1(AContent { val: 1 }),
+    };
+    func(msg);
+
+    let msg = Message {
+        msg_id: 2,
+        content: MessageContent::Message2(BContent { val: 2 }),
+    };
+    func(msg);
+}
+```
+1. 其他语言中当你对 null 进行操作时，例如调用一个方法，就会直接抛出 null 异常，导致程序的崩溃，因此我们在编程时需要格外的小心去处理这些 null 空值。  
+尽管如此，空值的表达依然非常有意义，因为空值表示当前时刻变量的值是缺失的。有鉴于此，Rust 吸取了众多教训，决定抛弃 null，而改为使用 Option 枚举变量来表述这种结果。
+1. 用 Option 枚举用于处理空值，T 是泛型参数，Some(T)表示该枚举成员的数据类型是 T，换句话说，**Some 可以包含任何类型的数据**，Option<T> 枚举是如此有用以至于它被包含在了 prelude（prelude 属于 Rust 标准库，Rust 会将最常用的类型、函数等提前引入其中，省得我们再手动引入）之中，所以你不需要将其显式引入作用域，因此实际使用中可以省略 Option:: 前缀。
+```rust
+// Option<T> 定义
+// enum Option<T> {
+//     Some(T),
+//     None,
+// }
+
+#![allow(unused)]
+fn main() {
+    let some_number = Some(5);
+    let some_string = Some("a string");
+    let absent_number: Option<i32> = None;
+}
+```
+1. 如果使用 None 而不是 Some，需要告诉 Rust Option<T> 是什么类型的，因为编译器只通过 None 值无法推断出 Some 成员保存的值的类型。
+1. 当有一个 Some 值时，我们就知道存在一个值，而这个值保存在 Some 中。当有个 None 值时，在某种意义上，它跟空值具有相同的意义：并没有一个有效的值。那么，Option<T> 为什么就比空值要好呢？  
+    因为 Option<T> 和 T（这里 T 可以是任何类型）是不同的类型，例如，这段代码不能编译，因为它尝试将 Option<i8>(Option<T>) 与 i8(T) 相加：
+    ```rust
+    let x: i8 = 5;
+    let y: Option<i8> = Some(5);
+
+    let sum = x + y;
+
+    error[E0277]: the trait bound `i8: std::ops::Add<std::option::Option<i8>>` is not satisfied
+    -->
+      |
+    5 |     let sum = x + y;
+      |                 ^ no implementation for `i8 + std::option::Option<i8>`
+      |
+    ```
+    很好！事实上，错误信息意味着 Rust 不知道该如何将 Option<i8> 与 i8 相加，因为它们的类型不同。当在 Rust 中拥有一个像 i8 这样类型的值时，编译器确保它总是有一个有效的值，我们可以放心使用而无需做空值检查。只有当使用 Option<i8>（或者任何用到的类型）的时候才需要担心可能没有值，而编译器会确保我们在使用值之前处理了为空的情况。
+1. 换句话说，在对 Option<T> 进行 T 的运算之前必须将其转换为 T。通常这能帮助我们捕获到空值最常见的问题之一：期望某值不为空但实际上为空的情况。不再担心会错误的使用一个空值，会让你对代码更加有信心。**为了拥有一个可能为空的值，你必须要显式的将其放入对应类型的 Option<T> 中。接着，当使用这个值时，必须明确的处理值为空的情况。只要一个值不是 Option<T> 类型，你就可以安全的认定它的值不为空。**这是 Rust 的一个经过深思熟虑的设计决策，来**限制空值的泛滥以增加 Rust 代码的安全性**。
+1. **为了使用 Option<T> 值，需要编写处理每个成员的代码。你想要一些代码只当拥有 Some(T) 值时运行，允许这些代码使用其中的 T。也希望一些代码在值为 None 时运行，这些代码并没有一个可用的 T 值。**
+1. match 表达式就是这么一个处理枚举的控制流结构：它会根据枚举的成员运行不同的代码，这些代码可以使用匹配到的值中的数据。
+    ```rust
+    fn plus_one(x: Option<i32>) -> Option<i32> {
+        match x {
+            None => None,
+            Some(i) => Some(i + 1),
+        }
+    }
+
+    fn main() {
+        let five = Some(5);
+        let six = plus_one(five);
+        let none = plus_one(None);
+    }
+    ```
+
+### Array
 
 ## Exercises
