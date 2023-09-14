@@ -337,59 +337,48 @@ str 类型是硬编码进可执行文件，也无法被修改，但是 String �
     // 这里提示的很清楚，我们索引的字节落在了'中'字符的内部，这种返回没有任何意义。
     ```
 1. 无法使用 Index<{integer}> 索引字符串字符，那么该如何遍历一个 String 呢？这可以通过 **chars() 和 bytes() 函数分别对字符串使用字符和字节的形式进行遍历**。chars() 会以 Unicode 字符的方式遍历字符串；bytes() 以返回字符串的底层字节数组的方式遍历字符串。
-```rust
-for c in "中国人".chars() {
-    println!("{}", c);
-}
+    ```rust
+    for c in "中国人".chars() {
+        println!("{}", c);
+    }
 
-// output:
-// 中
-// 国
-// 人
+    // output:
+    // 中
+    // 国
+    // 人
 
-for b in "中国人".bytes() {
-    println!("{}", b);
-}
+    for b in "中国人".bytes() {
+        println!("{}", b);
+    }
 
-// output:
-// 228
-// 184
-// 173
-// 229
-// 155
-// 189
-// 228
-// 186
-// 186
-```
+    // output:
+    // 228
+    // 184
+    // 173
+    // 229
+    // 155
+    // 189
+    // 228
+    // 186
+    // 186
+    ```
 1. 可以通过使用 '\' 输出 ASCII 和 Unicode 字符来进行转义，'\\\\' 相当于 '\\'，另外可以通过 r#"something ..."# 来创建原始字符串字面量（raw string literals）允许在字符串中包含特殊字符（比如反斜杠'\\'）而无需进行转义。
+1. **连接 (Concatenate)：使用 + 或者 += 连接字符串，要求右边的参数必须为字符串的切片引用（Slice）类型**。
+1. **当调用 + 的操作符时，相当于调用了 std::string 标准库中的 add() 方法（fn add(self, s: &str) -> String），这里 add() 方法的第二个参数是一个引用的类型。因此我们在使用 +， 必须传递切片引用类型，不能直接传递 String 类型。该操作返回一个新的字符串。**
+    ```rust
+    fn main() {
+        let string_append = String::from("hello ");
+        let string_rust = String::from("rust");
+        // &string_rust会自动解引用为&str
+        let result = string_append + &string_rust;
+        let mut result = result + "!"; // `result + "!"` 中的 `result` 是不可变的
+        result += "!!!";
 
-1. 
-连接 (Concatenate)
-1、使用 + 或者 += 连接字符串
-
-使用 + 或者 += 连接字符串，要求右边的参数必须为字符串的切片引用（Slice）类型。其实当调用 + 的操作符时，相当于调用了 std::string 标准库中的 add() 方法，这里 add() 方法的第二个参数是一个引用的类型。因此我们在使用 +， 必须传递切片引用类型。不能直接传递 String 类型。+ 是返回一个新的字符串，所以变量声明可以不需要 mut 关键字修饰。
-
-示例代码如下：
-
-fn main() {
-    let string_append = String::from("hello ");
-    let string_rust = String::from("rust");
-    // &string_rust会自动解引用为&str
-    let result = string_append + &string_rust;
-    let mut result = result + "!"; // `result + "!"` 中的 `result` 是不可变的
-    result += "!!!";
-
-    println!("连接字符串 + -> {}", result);
-}
-代码运行结果：
-
-连接字符串 + -> hello rust!!!!
-add() 方法的定义：
-
-fn add(self, s: &str) -> String
-因为该方法涉及到更复杂的特征功能，因此我们这里简单说明下：
-
+        println!("连接字符串 + -> {}", result);
+    }
+    ```
+1. 因为 add 方法涉及第一个参数是 String，可能涉及到所有权问题，所以 + 也要注意这个情况。s1 这个变量通过调用 add() 方法后，所有权被转移到 add() 方法里面，然后 add() 方法调用完后就被释放了。
+```rust
 fn main() {
     let s1 = String::from("hello,");
     let s2 = String::from("world!");
@@ -399,63 +388,38 @@ fn main() {
     // 下面的语句如果去掉注释，就会报错
     // println!("{}",s1);
 }
-self 是 String 类型的字符串 s1，该函数说明，只能将 &str 类型的字符串切片添加到 String 类型的 s1 上，然后返回一个新的 String 类型，所以 let s3 = s1 + &s2; 就很好解释了，将 String 类型的 s1 与 &str 类型的 s2 进行相加，最终得到 String 类型的 s3。
-
-由此可推，以下代码也是合法的：
-
+```
+1. self 是 String 类型的字符串，该函数说明，只能将 &str 类型的字符串切片添加到 String 类型的变量，然后返回一个新的 String 类型，所以 let s3 = s1 + &s2; 就很好解释了，将 String 类型的 s1 与 &str 类型的 s2 进行相加，最终得到 String 类型的 s3。由此可推，以下代码也是合法的，其中String + &str返回一个 String，然后再继续跟一个 &str 进行 + 操作，返回一个 String 类型，不断循环，最终生成一个 s，也是 String 类型。
+```rust
 let s1 = String::from("tic");
 let s2 = String::from("tac");
 let s3 = String::from("toe");
 
-// String = String + &str + &str + &str + &str
 let s = s1 + "-" + &s2 + "-" + &s3;
-String + &str返回一个 String，然后再继续跟一个 &str 进行 + 操作，返回一个 String 类型，不断循环，最终生成一个 s，也是 String 类型。
-
-s1 这个变量通过调用 add() 方法后，所有权被转移到 add() 方法里面， add() 方法调用后就被释放了，同时 s1 也被释放了。再使用 s1 就会发生错误。这里涉及到所有权转移（Move）的相关知识。
-
-2、使用 format! 连接字符串
-
-format! 这种方式适用于 String 和 &str 。format! 的用法与 print! 的用法类似，详见格式化输出。
-
-示例代码如下：
-
+```
+1. 使用 format! 连接字符串：format! 这种方式适用于 String 和 &str，用法与 print! 的用法类似。这种情况下 s1 和 s2 可以为 &str 和 String 类型，且 String 类型所有权未发生过转移。
+```rust
 fn main() {
     let s1 = "hello";
     let s2 = String::from("rust");
     let s = format!("{} {}!", s1, s2);
     println!("{}", s);
+    println!("{}",s1);
+    println!("{}",s2);
 }
-代码运行结果：
+```
 
-hello rust!
-
-
-1. 字符串深度剖析
-那么问题来了，为啥 String 可变，而字符串字面值 str 却不可以？
-
-就字符串字面值来说，我们在编译时就知道其内容，最终字面值文本被直接硬编码进可执行文件中，这使得字符串字面值快速且高效，这主要得益于字符串字面值的不可变性。不幸的是，我们不能为了获得这种性能，而把每一个在编译时大小未知的文本都放进内存中（你也做不到！），因为有的字符串是在程序运行得过程中动态生成的。
-
-对于 String 类型，为了支持一个可变、可增长的文本片段，需要在堆上分配一块在编译时未知大小的内存来存放内容，这些都是在程序运行时完成的：
-
-首先向操作系统请求内存来存放 String 对象
-在使用完成后，将内存释放，归还给操作系统
-其中第一部分由 String::from 完成，它创建了一个全新的 String。
-
-重点来了，到了第二部分，就是百家齐放的环节，在有垃圾回收 GC 的语言中，GC 来负责标记并清除这些不再使用的内存对象，这个过程都是自动完成，无需开发者关心，非常简单好用；但是在无 GC 的语言中，需要开发者手动去释放这些内存对象，就像创建对象需要通过编写代码来完成一样，未能正确释放对象造成的后果简直不可估量。
-
-对于 Rust 而言，安全和性能是写到骨子里的核心特性，如果使用 GC，那么会牺牲性能；如果使用手动管理内存，那么会牺牲安全，这该怎么办？为此，Rust 的开发者想出了一个无比惊艳的办法：变量在离开作用域后，就自动释放其占用的内存：
-
-{
-    let s = String::from("hello"); // 从此处起，s 是有效的
-
-    // 使用 s
-}                                  // 此作用域已结束，
-                                   // s 不再有效，内存被释放
-与其它系统编程语言的 free 函数相同，Rust 也提供了一个释放内存的函数： drop，但是不同的是，其它语言要手动调用 free 来释放每一个变量占用的内存，而 Rust 则在变量离开作用域时，自动调用 drop 函数: 上面代码中，Rust 在结尾的 } 处自动调用 drop。
-
-其实，在 C++ 中，也有这种概念: Resource Acquisition Is Initialization (RAII)。如果你使用过 RAII 模式的话应该对 Rust 的 drop 函数并不陌生。
-
-这个模式对编写 Rust 代码的方式有着深远的影响，在后面章节我们会进行更深入的介绍。
+1. 为什么 String 可变，而字符串字面值 str 却不可以？**就字符串字面值来说，在编译时就知道其内容，最终字面值文本会被直接硬编码进可执行文件中，这使得字符串字面值快速且高效，这主要得益于字符串字面值的不可变性**。
+1. **对于 String 类型，为了支持一个可变、可增长的文本片段，需要在堆上分配一块在编译时未知大小的内存来存放内容，这些都是在程序运行时完成的**。首先向操作系统请求内存来存放 String 对象，在使用完成后，将内存释放，归还给操作系统。  
+    其中第一部分由 String::from 完成，它创建了一个全新的 String。到了第二部分，就是百家齐放的环节，在有垃圾回收 GC 的语言中，GC 来负责标记并清除这些不再使用的内存对象，这个过程都是自动完成，无需开发者关心，非常简单好用；但是在无 GC 的语言中，需要开发者手动去释放这些内存对象，就像创建对象需要通过编写代码来完成一样，未能正确释放对象造成的后果简直不可估量。  
+    对于 Rust 而言，**安全和性能是核心特性**，如果**使用 GC，那么会牺牲性能；如果使用手动管理内存，那么会牺牲安全**，这该怎么办？为此，Rust 的开发者想出了一个无比惊艳的办法：**变量在离开作用域后，就自动释放其占用的内存**。
+    ```rust
+    {
+        let s = String::from("hello"); // 从此处起，s 是有效的
+    }                                  // 此作用域已结束，s 不再有效，内存被释放
+    ```
+    与其它系统编程语言的 free 函数相同，**Rust 也提供了一个释放内存的函数 drop**，但是**不同的是，其它语言要手动调用 free 来释放每一个变量占用的内存，而 Rust 则在变量离开作用域时，自动调用 drop 函数: 上面代码中，Rust 在结尾的 } 处自动调用 drop**。  
+    其实，在 C++ 中，也有这种概念: **Resource Acquisition Is Initialization (RAII)**。如果你使用过 RAII 模式的话应该对 Rust 的 drop 函数并不陌生。
 
 ### Tuple
 
@@ -492,6 +456,123 @@ hello rust!
     ```
 
 ### Struct
+
+1. 初始化实例时，每个字段都需要进行初始化，字段顺序不需要和结构体定义时的顺序一致，通过 . 操作符即可访问结构体实例内部的字段值。注意的是，必须要将结构体实例声明为可变的，才能修改其中的字段，而且 **Rust 不支持将某个字段标记为可变，只能把整个 struct 的变量声明为可变**。
+    ```rust
+    #![allow(unused)]
+    struct User {
+        active: bool,
+        username: String,
+        email: String,
+        sign_in_count: u64,
+    }
+
+    fn main() {
+        let mut user1 = User {
+            email: String::from("someone@example.com"),
+            username: String::from("someusername123"),
+            active: true,
+            sign_in_count: 1,
+        };
+
+        user1.email = String::from("anotheremail@example.com");
+    }
+    ```
+1. 可以通过写构建函数的方式简化结构体的构建，另外当函数参数和结构体字段同名时，可以只使用函数参数名即可进行初始化。
+    ```rust
+    fn build_user(email: String, username: String) -> User {
+        User {
+            email,       // i.e. email: email
+            username,    // i.e. username: username
+            active: true,
+            sign_in_count: 1,
+        }
+    }
+    ```
+1. 根据已有的结构体实例，创建新的结构体实例，可以使用结构体更新语法来简化。..user1 语法表明凡是我们没有显式声明的字段，全部从 user1 中自动获取，需要注意的是 .. 必须在结构体的尾部使用。
+    ```rust
+    let user2 = User {
+        active: user1.active,
+        username: user1.username,
+        email: String::from("another@example.com"),
+        sign_in_count: user1.sign_in_count,
+    };
+
+    // 结构体更新语法
+    let user2 = User {
+        email: String::from("another@example.com"),
+        ..user1
+    };
+    ```
+1. 把结构体中具有所有权的字段转移出去后，将无法再访问该字段，但是可以正常访问其它的字段。
+1. 元组结构体(Tuple Struct)：结构体必须要有名称，但是结构体的字段可以没有名称，这种结构体长得很像元组，因此被称为元组结构体，比元组多了个结构体名字来代表类型的含义。
+    ```rust
+    // Point 元组结构体，众所周知 3D 点是 (x, y, z) 形式的坐标点，因此我们无需再为内部的字段逐一命名为：x, y, z
+    #![allow(unused)]
+    fn main() {
+        struct Color(i32, i32, i32);
+        struct Point(i32, i32, i32);
+
+        let black = Color(0, 0, 0);
+        let origin = Point(0, 0, 0);
+    }
+    ```
+1. 单元结构体(Unit-like Struct)：单元结构体就跟单元类型很像，**没有任何字段和属性**，但是好在，它还挺有用。如果你**定义一个类型，但是不关心该类型的内容, 只关心它的行为时，就可以使用单元结构体**。
+    ```rust
+    struct AlwaysEqual;
+
+    let subject = AlwaysEqual;
+
+    // 我们不关心 AlwaysEqual 的字段数据，只关心它的行为，因此将它声明为单元结构体，然后再为它实现某个特征
+    impl SomeTrait for AlwaysEqual {
+
+    }
+    ```
+1. 你也可以让 User 结构体从其它对象借用数据，不过这么做，就需要引入生命周期(lifetimes)这个新概念，简而言之，生命周期能确保结构体的作用范围要比它所借用的数据的作用范围要小。如果你想在结构体中使用一个引用，就必须加上生命周期，否则就会报错,未来在生命周期中会讲到如何修复这个问题以便在结构体中存储引用，不过在那之前，我们会避免在结构体中使用引用类型。
+1. 直接使用 {} 格式化打印一个对象，需要该对象类型实现 Display 特征，用于输出打印。**基本类型都默认实现了该特征，但结构体不默认实现 Display 特征**，原因在于结构体较为复杂，如：你想要逗号对字段进行分割吗？需要括号吗？加在什么地方？所有的字段都应该显示？由于这种复杂性，**如果要用 {} 的方式打印结构体，那就自己实现 Display 特征**。
+1. **使用 {:?} 打印一个对象，需要该对象类型实现 Debug 特征，和 Display 功能一致但生成更多的信息，通常用于调试目的。Rust 默认不会为结构体实现 Debug 特征，需要手动实现或使用 derive 派生**。derive 派生 Rust 自动为我们提供的实现，看上基本就跟结构体的定义形式一样，**当结构体较大时，我们可能希望能够有更好的输出表现，此时可以使用 {:#?} 来替代 {:?}，这个会自动分行使内容更清楚**。如果还是不满足，那还是自己实现 Display 特征，以向用户更美的展示你的结构体内容。
+    ```rust
+    #[derive(Debug)]
+    struct Rectangle {
+        width: u32,
+        height: u32,
+    }
+
+    fn main() {
+        let rect1 = Rectangle {
+            width: 30,
+            height: 50,
+        };
+
+        println!("rect1 is {:?}", rect1);
+    }
+    ```
+1. 还有一个简单的输出 debug 信息的方法，那就是使用 dbg! 宏。dbg! 宏**需要 Debug 特征**，它会拿走表达式的所有权，然后打印出**相应的文件名、行号、表达式的求值结果等 debug 信息，最终还会把表达式值的所有权返回**。
+```rust
+#[derive(Debug)]
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let scale = 2;
+    let rect1 = Rectangle {
+        width: dbg!(30 * scale), // 最终还会把表达式值的所有权返回，所以 width 可以被绑定，这个写法可以使用
+        height: 50,
+    };
+
+    dbg!(&rect1);
+}
+
+$ cargo run
+[src/main.rs:10] 30 * scale = 60
+[src/main.rs:14] &rect1 = Rectangle {
+    width: 60,
+    height: 50,
+}
+```
+1. dbg! 输出到标准错误输出 stderr，而 println! 输出到标准输出 stdout。
 
 ### Enum
 
@@ -555,6 +636,7 @@ fn func(msg: Message) {
         }
     }
 }
+
 fn main() {
     let msg = Message {
         msg_id: 1,
