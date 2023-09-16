@@ -13,6 +13,7 @@
     1. [Struct](#struct)
     1. [Enum](#enum)
     1. [Array](#array)
+    1. [Flow Control](#flow-control)
 1. [Exercises](#exercises)
 
 ## Notes
@@ -704,5 +705,86 @@ fn main() {
     ```
 
 ### Array
+
+### Flow Control
+
+1. 可以非常方便地用 if else 实现三元表达式和更复杂的变量绑定形式。这里的原理是 if else 语句块是表达式，表达式而非语句代表着有返回值（不写的话自动返回 ()），所以这里我们可以使用 if 表达式的返回值进行变量绑定。一般要求每个分支返回的类型一样，不过一些特殊情况允许在不同分支中返回不同类型的值。
+    ```rust
+    let number = if condition {
+            5
+        } else {
+            6
+        };
+
+    // 结合循环使用
+    let mut v = 0;
+    for i in 1..10 {
+        v = if i == 9 {
+            continue
+        } else {
+            i
+        }
+    }
+    println!("{}", v);
+    ```
+1. **使用 for 时我们往往使用集合的引用形式，除非你不想在后面的代码中继续使用该集合（比如我们这里使用了 container 的引用）。如果不使用引用的话，所有权会被转移（move）到 for 语句块中，后面就无法再使用这个集合了**。  
+    对于实现了 copy 特征的数组（比如 i32 数组可以，String 数组不行）而言， for item in arr 并不会把 arr 的所有权转移，而是直接对其进行了拷贝，显然这也应该使用引用来避免的开销。
+    ```rust
+    for item in &container {
+    // ...
+    }
+    ```
+1. 如果想在循环中，修改该元素，使用 mut 关键字。
+    ```rust
+    for item in &mut container {
+    // ...
+    }
+    ```
+1. 循环中获取元素的索引。
+    ```rust
+    fn main() {
+        let a = [4, 3, 2, 1];
+        for (i, v) in a.iter().enumerate() {
+            println!("第{}个元素是{}", i + 1, v);
+        }
+    }
+    ```
+1. 当索引无用时可以用 _ 在 for 循环中来忽略，**在 Rust 中 _ 的含义是忽略该值或者类型的意思**，如果不使用 _，那么编译器会给你一个 变量未使用的 的警告
+    ```rust
+    for _ in 0..10 {
+    }
+    ```
+1. **在循环中应该使用 in 而非通过下标索引访问**
+    ```rust
+    // Bad
+    let collection = [1, 2, 3, 4, 5];
+    for i in 0..collection.len() {
+    let item = collection[i];
+    }
+
+    // Good
+    for item in collection {
+    }
+    ```
+    代码更简洁：第二段代码使用了 Rust 中的迭代器（iterator）机制，这使得代码更加简洁和易读。它使用 for item in collection 的语法，不需要显式地使用索引来访问集合中的元素，这降低了代码的复杂性。  
+    避免了越界错误：在第一段代码中，你使用了一个循环来遍历集合，通过索引来访问元素。这种方式存在越界错误的风险，因为你需要确保索引不会超出集合的边界。如果索引超出了集合的长度，就会导致运行时错误。第二段代码使用迭代器，完全避免了这种风险，因为它会自动处理集合的边界。    
+    更好的性能：使用迭代器通常会比手动管理索引的方式更高效，因为迭代器可以根据集合的具体类型和实现来选择最优的遍历方式，而且可以避开检查索引是否越界的开销。
+1. 如果你需要一个条件来循环，当该条件为 true 时，继续循环，条件为 false，跳出循环，那么 while 就非常适用。
+1. loop 就是一个简单的无限循环，你可以在内部实现逻辑通过 break 关键字来控制循环何时结束。因为只能通过 break 跳出，所以这里 break 可以单独使用，也可以带一个返回值，有些类似 return，这也使得 loop 是一个表达式，因此可以返回一个值。
+    ```rust
+    fn main() {
+        let mut counter = 0;
+
+        let result = loop {
+            counter += 1;
+
+            if counter == 10 {
+                break counter * 2;
+            }
+        };
+
+        println!("The result is {}", result);
+    }
+    ```
 
 ## Exercises
