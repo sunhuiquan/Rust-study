@@ -14,6 +14,10 @@
     1. [Enum](#enum)
     1. [Array](#array)
     1. [Flow Control](#flow-control)
+    1. [Match & If let](#match--if-let)
+    1. [Method](#method)
+    1. [Generic](#generic)
+    1. [Trait](#trait)
 1. [Exercises](#exercises)
 
 ## Notes
@@ -786,5 +790,344 @@ fn main() {
         println!("The result is {}", result);
     }
     ```
+
+### Match & If let
+
+1. match 类似与其他语言中的 switch，但是更强大。**match 的匹配必须要穷举出所有可能，因此这里用 _ 来代表未列出的所有可能性；match 的每一个分支都必须是一个表达式，且所有分支的表达式最终返回值的类型必须相同。**
+    ```rust
+    enum Direction {
+        East,
+        West,
+        North,
+        South,
+    }
+
+    fn main() {
+        let dire = Direction::South;
+        match dire {
+            Direction::East => println!("East"),
+            Direction::North | Direction::South => {
+                println!("South or North");
+            },
+            _ => println!("West"),
+        };
+    }
+    ```
+<!-- TODO 1. match 中 X | Y，类似逻辑运算符或，代表该分支可以匹配 X 也可以匹配 Y，只要满足一个即可。 -->
+1. match 允许我们将一个值与一系列的模式相比较，并根据相匹配的模式执行对应的代码。match 后的表达式返回值可以是任意类型，也可以返回默认返回 () 类型当作无返回值。
+    ```txt
+    match target {
+        模式1 => 表达式1,
+        模式2 => {
+            语句1;
+            语句2;
+            表达式2
+        },
+        _ => 表达式3
+    }
+
+    // example:
+    enum Coin {
+        Penny,
+        Nickel,
+        Dime,
+        Quarter,
+    }
+
+    fn value_in_cents(coin: Coin) -> u8 {
+        match coin {
+            Coin::Penny =>  {
+                println!("Lucky penny!");
+                1
+            },
+            Coin::Nickel => 5,
+            Coin::Dime => 10,
+            Coin::Quarter => 25,
+        }
+    }
+    ```
+1. 接下来是 match 的分支。一个分支有两个部分：一个模式和针对该模式的处理代码。每个分支相关联的代码是一个表达式，而表达式的结果值将作为整个 match 表达式的返回值。如果分支有多行代码，那么需要用 {} 包裹。
+1. 当 match 表达式执行时，它将目标值 coin 按顺序依次与每一个分支的模式相比较，如果模式匹配了这个值，那么模式之后的代码将被执行。如果模式并不匹配这个值，将继续执行下一个分支。
+1. match 本身也是一个表达式，因此可以用它来赋值。
+    ```rust
+    enum IpAddr {
+    Ipv4,
+    Ipv6
+    }
+
+    fn main() {
+        let ip1 = IpAddr::Ipv6;
+        let ip_str = match ip1 {
+            IpAddr::Ipv4 => "127.0.0.1",
+            _ => "::1",
+        };
+
+        println!("{}", ip_str);
+    }
+    ```
+<!-- 1. 模式匹配的另外一个重要功能是从模式中取出绑定的值，例如：
+
+#[derive(Debug)]
+enum UsState {
+    Alabama,
+    Alaska,
+    // --snip--
+}
+
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter(UsState), // 25美分硬币
+}
+其中 Coin::Quarter 成员还存放了一个值：美国的某个州（因为在 1999 年到 2008 年间，美国在 25 美分(Quarter)硬币的背后为 50 个州印刷了不同的标记，其它硬币都没有这样的设计）。
+
+接下来，我们希望在模式匹配中，获取到 25 美分硬币上刻印的州的名称：
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter(state) => {
+            println!("State quarter from {:?}!", state);
+            25
+        },
+    }
+}
+上面代码中，在匹配 Coin::Quarter(state) 模式时，我们把它内部存储的值绑定到了 state 变量上，因此 state 变量就是对应的 UsState 枚举类型。
+
+例如有一个印了阿拉斯加州标记的 25 分硬币：Coin::Quarter(UsState::Alaska), 它在匹配时，state 变量将被绑定 UsState::Alaska 的枚举值。
+
+再来看一个更复杂的例子：
+
+enum Action {
+    Say(String),
+    MoveTo(i32, i32),
+    ChangeColorRGB(u16, u16, u16),
+}
+
+fn main() {
+    let actions = [
+        Action::Say("Hello Rust".to_string()),
+        Action::MoveTo(1,2),
+        Action::ChangeColorRGB(255,255,0),
+    ];
+    for action in actions {
+        match action {
+            Action::Say(s) => {
+                println!("{}", s);
+            },
+            Action::MoveTo(x, y) => {
+                println!("point from (0, 0) move to ({}, {})", x, y);
+            },
+            Action::ChangeColorRGB(r, g, _) => {
+                println!("change color into '(r:{}, g:{}, b:0)', 'b' has been ignored",
+                    r, g,
+                );
+            }
+        }
+    }
+}
+运行后输出：
+
+
+$ cargo run
+   Compiling world_hello v0.1.0 (/Users/sunfei/development/rust/world_hello)
+    Finished dev [unoptimized + debuginfo] target(s) in 0.16s
+     Running `target/debug/world_hello`
+Hello Rust
+point from (0, 0) move to (1, 2)
+change color into '(r:255, g:255, b:0)', 'b' has been ignored
+
+1. 穷尽匹配
+在文章的开头，我们简单总结过 match 的匹配必须穷尽所有情况，下面来举例说明，例如：
+
+enum Direction {
+    East,
+    West,
+    North,
+    South,
+}
+
+fn main() {
+    let dire = Direction::South;
+    match dire {
+        Direction::East => println!("East"),
+        Direction::North | Direction::South => {
+            println!("South or North");
+        },
+    };
+}
+我们没有处理 Direction::West 的情况，因此会报错：
+
+error[E0004]: non-exhaustive patterns: `West` not covered // 非穷尽匹配，`West` 没有被覆盖
+  -> src/main.rs:10:11
+   |
+1  | / enum Direction {
+2  | |     East,
+3  | |     West,
+   | |     ---- not covered
+4  | |     North,
+5  | |     South,
+6  | | }
+   | |_- `Direction` defined here
+...
+10 |       match dire {
+   |             ^^^^ pattern `West` not covered // 模式 `West` 没有被覆盖
+   |
+   = help: ensure that all possible cases are being handled, possibly by adding wildcards or more match arms
+   = note: the matched value is of type `Direction`
+不禁想感叹，Rust 的编译器真强大，忍不住想爆粗口了，sorry，如果你以后进一步深入使用 Rust 也会像我这样感叹的。Rust 编译器清晰地知道 match 中有哪些分支没有被覆盖, 这种行为能强制我们处理所有的可能性，有效避免传说中价值十亿美金的 null 陷阱。
+
+1. _ 通配符
+当我们不想在匹配时列出所有值的时候，可以使用 Rust 提供的一个特殊模式，例如，u8 可以拥有 0 到 255 的有效的值，但是我们只关心 1、3、5 和 7 这几个值，不想列出其它的 0、2、4、6、8、9 一直到 255 的值。那么, 我们不必一个一个列出所有值, 因为可以使用特殊的模式 _ 替代：
+
+let some_u8_value = 0u8;
+match some_u8_value {
+    1 => println!("one"),
+    3 => println!("three"),
+    5 => println!("five"),
+    7 => println!("seven"),
+    _ => (),
+}
+通过将 _ 其放置于其他分支后，_ 将会匹配所有遗漏的值。() 表示返回单元类型与所有分支返回值的类型相同，所以当匹配到 _ 后，什么也不会发生。
+
+除了_通配符，用一个变量来承载其他情况也是可以的。
+
+#[derive(Debug)]
+enum Direction {
+    East,
+    West,
+    North,
+    South,
+}
+
+fn main() {
+    let dire = Direction::South;
+    match dire {
+        Direction::East => println!("East"),
+        other => println!("other direction: {:?}", other),
+    };
+}
+然而，在某些场景下，我们其实只关心某一个值是否存在，此时 match 就显得过于啰嗦。 -->
+
+1. if let 匹配
+<!-- TODO -->
+
+### Method
+
+1. 在 Rust 中，方法往往和对象成对出现，如 object.method()。例如读取一个文件写入缓冲区，如果用函数的写法 read(f, buffer)，用方法的写法 f.read(buffer)。Rust 的方法往往跟结构体、枚举、特征(Trait)一起使用。
+1.  Rust 的对象定义和方法定义是分离的，这种数据和使用分离的方式，会给予使用者极高的灵活度。
+    ![IMG](/images/struct1.png)
+1. **Rust 使用 impl 来定义一个类型的方法**。
+    ```rust
+    #[derive(Debug)]
+    struct Rectangle {
+        width: u32,
+        height: u32,
+    }
+
+    impl Rectangle {
+        fn area(&self) -> u32 {
+            self.width * self.height
+        }
+    }
+
+    fn main() {
+        let rect1 = Rectangle { width: 30, height: 50 };
+
+        println!(
+            "The area of the rectangle is {} square pixels.",
+            rect1.area()
+        );
+    }
+    ```
+1. self、&self 和 &mut self：在方法的签名中，**&self 其实是 self: &Self 的简写，在一个 impl 块内，Self 指代被实现方法的结构体类型，self 指代此类型的实例，换句话说，self 指代的是 Rectangle 结构体实例**，这样的写法会让我们的代码简洁很多，而且非常便于理解：我们为哪个结构体实现方法，那么 self 就是指代哪个结构体的实例。
+1. **self 依然有所有权的概念，self 表示 Rectangle 的所有权转移到该方法中，这种形式用的较少，通常用于将当前的对象转成另外一个对象时使用，可以防止对之前对象的误调用；&self 表示该方法对 Rectangle 的不可变借用
+&mut self 表示可变借用**。总之，self 的使用就跟函数参数一样，要严格遵守 Rust 的所有权规则。
+1. **仅仅通过使用 self 作为第一个参数来使方法获取实例的所有权是很少见的，这种使用方式往往用于把当前的对象转成另外一个对象时使用，转换完后，就不再关注之前的对象，且可以防止对之前对象的误调用**。
+1. 使用方法代替函数有以下好处：不用在函数签名中重复书写 self 对应的类型，代码的组织性和内聚性更强，对于代码维护和阅读来说，好处巨大。
+1. 允许方法名跟结构体的字段名相同，方法跟字段同名，往往适用于实现 getter 访问器。
+    ```rust
+    pub struct Rectangle {
+        width: u32,
+        height: u32,
+    }
+
+    impl Rectangle {
+        pub fn new(width: u32, height: u32) -> Self {
+            Rectangle { width, height }
+        }
+
+        pub fn width(&self) -> u32 {
+            return self.width;
+        }
+    }
+
+    fn main() {
+        let rect1 = Rectangle::new(30, 50);
+        println!("{}", rect1.width());
+    }
+    ```
+1. **Rust 并没有一个与 -> 等效的运算符，取而代之的是 Rust 有<u>自动引用和解引用</u>，方法调用是 Rust 中少数几个拥有这种行为的地方。当使用 object.something() 调用方法时，Rust 会<u>自动为 object 添加 &、&mut 或 * 以便使 object 与方法签名匹配</u>**。
+    ```rust
+    // 这两行是等价的
+    p1.distance(&p2);
+    (&p1).distance(&p2);
+    ```
+    **这种自动引用的行为之所以有效，是因为方法有一个明确的接收者 self，在给出接收者和方法名的前提下，Rust 可以明确地计算出方法是仅仅读取（&self），做出修改（&mut self）或者是获取所有权（self）**。
+
+1. 关联函数：通过**在 impl 代码块中写参数不包含 self 的函数即可为一个结构体定义一个构造器方法，也就是接受参数，构造并返回该结构体的实例**。这种定义在 impl 中且没有 self 的函数被称之为关联函数： 因为它没有 self，不能用 f.read() 的形式调用，因此它是一个函数而不是方法，它又在 impl 中，与结构体紧密关联，因此称为关联函数。
+    ```rust
+    impl Rectangle {
+        fn new(w: u32, h: u32) -> Rectangle {
+            Rectangle { width: w, height: h }
+        }
+    }
+    ```
+    **Rust 中有一个约定俗成的规则，使用 new 来作为构造器的名称，出于设计上的考虑，Rust 特地没有用 new 作为关键字**。  
+    因为是函数，所以不能用 . 的方式来调用，我们**需要用 :: 来调用**，例如 let sq = Rectangle::new(3, 3);。这个方法位于结构体的命名空间中：:: 语法用于关联函数和模块创建的命名空间。
+1. Rust 允许我们为一个结构体定义多个 impl 块，目的是提供**更多的灵活性和代码组织性，例如当方法多了后，可以把相关的方法组织在同一个 impl 块中，那么就可以形成多个 impl 块，分别完成不同功能部分**。
+    ```rust
+    // 就这个例子而言，我们没必要使用两个 impl 块，这里只是为了演示方便。
+    impl Rectangle {
+        fn area(&self) -> u32 {
+            self.width * self.height
+        }
+    }
+
+    impl Rectangle {
+        fn can_hold(&self, other: &Rectangle) -> bool {
+            self.width > other.width && self.height > other.height
+        }
+    }
+    ```
+1. 枚举类型之所以强大，不仅仅在于它好用、可以同一化类型，还在于，我们可以像结构体一样，为枚举实现方法：
+    ```rust
+    #![allow(unused)]
+    enum Message {
+        Quit,
+        Move { x: i32, y: i32 },
+        Write(String),
+        ChangeColor(i32, i32, i32),
+    }
+
+    impl Message {
+        fn call(&self) {
+            // 在这里定义方法体
+        }
+    }
+
+    fn main() {
+        let m = Message::Write(String::from("hello"));
+        m.call();
+    }
+    ```
+1. **除了结构体和枚举，我们还能为特征(trait)实现方法**
+
+### Generic
+
+### Trait
 
 ## Exercises
