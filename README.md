@@ -1128,6 +1128,266 @@ fn main() {
 
 ### Generic
 
+1. 泛型是一种多态形式，用同一功能的函数处理不同类型的数据，例如两个数的加法，无论是整数还是浮点数，甚至是自定义类型，都能进行支持。在不支持泛型的编程语言中，通常需要为每一种类型编写一个函数。
+1. 可以在函数中使用泛型，**泛型参数的名称你可以任意起，但是出于惯例，我们都用 T ( T 是 type 的首字母)来作为首选，这个名称越短越好，除非需要表达含义，否则一个字母是最完美的**。
+    ```rust
+    fn largest<T>(list: &[T]) -> T {
+        let mut largest = list[0];
+        for &item in list.iter() {
+            if item > largest {
+                largest = item;
+            }
+        }
+        largest
+    }
+
+    fn main() {
+        let number_list = vec![34, 50, 25, 100, 65];
+
+        let result = largest(&number_list);
+        println!("The largest number is {}", result);
+
+        let char_list = vec!['y', 'm', 'a', 'q'];
+
+        let result = largest(&char_list);
+        println!("The largest char is {}", result);
+    }
+
+    // 运行后报错：
+    error[E0369]: binary operation `>` cannot be applied to type `T`
+    -> src/main.rs:5:17
+      |
+    5 |         if item > largest {
+      |            ---- ^ ------- T
+      |            |
+      |            T
+      |
+    help: consider restricting type parameter `T`
+      |
+    1 | fn largest<T: std::cmp::PartialOrd>(list: &[T]) -> T {
+      |             ++++++++++++++++++++++
+    ```
+    **因为 T 可以是任何类型，但不是所有的类型都能进行比较，因此上面的错误中，编译器建议我们给 T 添加一个类型限制**，使用 std::cmp::PartialOrd 特征（Trait）对 T 进行限制，特征在下一节会详细介绍，现在你只要理解，该特征的目的就是让类型实现可比较的功能。
+1. **结构体中的字段类型也可以用泛型来定义**，下面代码定义了一个坐标点 Point，它可以存放任何类型的坐标值：
+    ```rust
+    struct Point<T> {
+        x: T,
+        y: T,
+    }
+
+    fn main() {
+        let integer = Point { x: 5, y: 10 };
+        let float = Point { x: 1.0, y: 4.0 };
+    }
+    ```
+    提前声明，跟泛型函数定义类似，首先我们在使用泛型参数之前必需要进行声明 Point<T>，接着就可以在结构体的字段类型中使用 T 来替代具体的类型，注意一个泛型类型只能代表一个类型，如果多个字段使用同一个泛型类型，那么这些字段必须是同一类型。
+1. 如果想让不同字段如 x 和 y 既能类型相同，又能类型不同，就需要使用不同的泛型参数，但泛型类型不易过多，这会显著降低代码可读性。
+    ```rust
+    struct Point<T,U> {
+        x: T,
+        y: U,
+    }
+
+    fn main() {
+        let p = Point{x: 1, y :1.1};
+    }
+    ```
+1. Option<T> 是一个拥有泛型 T 的枚举类型，它第一个成员是 Some(T)，存放了一个类型为 T 的值。得益于泛型的引入，我们**可以在任何一个需要返回值的函数中，去使用 Option<T> 枚举类型来做为返回值，用于返回一个任意类型的值 Some(T)，或者没有值 None**。
+    ```rust
+    enum Option<T> {
+        Some(T),
+        None,
+    }
+    ```
+1. Result<T, E> 枚举和 Option 一样，主要用于函数返回值，与 Option 用于值的存在与否不同，**Result 关注的主要是值的正确性**。
+    ```rust
+    enum Result<T, E> {
+        Ok(T),
+        Err(E),
+    }
+    ```
+    函数正常运行，则最后返回一个 Ok(T)，如果函数异常运行，则返回一个 Err(E)，E 是错误类型。  
+    例如打开一个文件：如果成功打开文件，则返回 Ok(std::fs::File)，因此 T 对应的是 std::fs::File 类型；而当打开文件时出现问题时，返回 Err(std::io::Error)，E 对应的就是 std::io::Error 类型。
+1. 实现泛型结构体的方法，需要先在 impl<T> 中声明。
+    ```rust
+    struct Point<T> {
+        x: T,
+        y: T,
+    }
+
+    impl<T> Point<T> { // 这里 Point<T> 不是泛型声明，而是一个结构体类型，因为定义的结构体就是 Point<T> 而不是 Point
+        fn x(&self) -> &T {
+            &self.x
+        }
+    }
+
+    fn main() {
+        let p = Point { x: 5, y: 10 };
+
+        println!("p.x = {}", p.x());
+    }
+    ```
+1. **方法本身也可以额外实现泛型，除了结构体中的泛型参数，我们还能在该结构体的方法中定义额外的泛型参数，就跟泛型函数一样，这里方法的泛型参数和结构体是不是泛型有没有泛型参数无关**。
+    ```rust
+    struct Point<T, U> {
+        x: T,
+        y: U,
+    }
+
+    impl<T, U> Point<T, U> {
+        fn mixup<V, W>(self, other: Point<V, W>) -> Point<T, W> {
+            Point {
+                x: self.x,
+                y: other.y,
+            }
+        }
+    }
+
+    fn main() {
+        let p1 = Point { x: 5, y: 10.4 };
+        let p2 = Point { x: "Hello", y: 'c'};
+
+        let p3 = p1.mixup(p2);
+
+        println!("p3.x = {}, p3.y = {}", p3.x, p3.y);
+    }
+    ```
+    T,U 是定义在结构体 Point 上的泛型参数，V,W 是单独定义在方法 mixup 上的泛型参数，它们并不冲突，说白了，你可以理解为，一个是结构体泛型，一个是函数泛型。
+1. **为具体的泛型类型实现方法，对于 Point<T> 类型，你不仅能定义基于 T 的方法，还能针对特定的具体类型，进行方法定义**。
+    ```rust
+    impl Point<f32> {
+        fn distance_from_origin(&self) -> f32 {
+            (self.x.powi(2) + self.y.powi(2)).sqrt()
+        }
+    }
+    ```
+    这段代码意味着 Point<f32> 类型会有一个方法 distance_from_origin，而**其他 T 不是 f32 类型的 Point<T> 实例则没有定义此方法**。这个方法计算点实例与坐标(0.0, 0.0) 之间的距离，并使用了只能用于浮点型的数学运算符。**这样我们就能针对特定的泛型类型实现某个特定的方法，对于其它泛型类型则没有定义该方法**。
+1. **const 泛型**：在之前的泛型中，可以抽象为一句话：针对类型实现的泛型，所有的泛型都是为了抽象不同的类型，那有没有**针对值的泛型**？  
+    在数组那节，有提到过很重要的一点：[i32; 2] 和 [i32; 3] 是不同的数组类型，比如下面的代码：
+    ```rust
+    fn display_array(arr: [i32; 3]) {
+        println!("{:?}", arr);
+    }
+
+    fn main() {
+        let arr: [i32; 3] = [1, 2, 3];
+        display_array(arr);
+
+        let arr: [i32;2] = [1,2];
+        display_array(arr);
+    }
+
+    error[E0308]: mismatched types // 类型不匹配
+    --> src/main.rs:10:19
+       |
+    10 |     display_array(arr);
+       |                   ^^^ expected an array with a fixed size of 3 elements, found one with 2 elements
+    ```
+    结合代码和报错，可以很清楚的看出，[i32; 3] 和 [i32; 2] 确实是两个完全不同的类型，因此无法用同一个函数调用。
+1. 首先，让我们修改代码，让 display_array 能打印任意长度的 i32 数组，只要使用数组切片，然后传入 arr 的不可变引用即可。
+    ```rust
+    fn display_array(arr: &[i32]) {
+        println!("{:?}", arr);
+    }
+
+    fn main() {
+        let arr: [i32; 3] = [1, 2, 3];
+        display_array(&arr);
+
+        let arr: [i32;2] = [1,2];
+        display_array(&arr);
+    }
+    ```
+1. 接着，将 i32 改成所有类型的数组：
+    ```rust
+    fn display_array<T: std::fmt::Debug>(arr: &[T]) {
+        println!("{:?}", arr);
+    }
+
+    fn main() {
+        let arr: [i32; 3] = [1, 2, 3];
+        display_array(&arr);
+
+        let arr: [i32;2] = [1,2];
+        display_array(&arr);
+    }
+    ```
+1. **通过引用，我们可以很轻松的解决处理任何类型数组的问题，但是如果在某些场景下引用不适宜用或者干脆不能用呢**？  
+    好在现在有了 **const 泛型，也就是针对值的泛型，可以用于处理数组长度的问题**。
+    ```rust
+    fn display_array<T: std::fmt::Debug, const N: usize>(arr: [T; N]) {
+        println!("{:?}", arr);
+    }
+    fn main() {
+        let arr: [i32; 3] = [1, 2, 3];
+        display_array(arr);
+
+        let arr: [i32; 2] = [1, 2];
+        display_array(arr);
+    }
+    ```
+    <!-- TODO 你们知道为什么以前 Rust 的一些数组库，在使用的时候都限定长度不超过 32 吗？因为它们会为每个长度都单独实现一个函数，简直。。。毫无人性。难道没有什么办法可以解决这个问题吗？ -->
+1. 如上所示，我们定义了一个类型为 [T; N] 的数组，其中 T 是一个基于类型的泛型参数，而**重点在于 N 这个泛型参数，const N: usize，它是一个基于值的泛型参数，这里类型是确定的，值是任意的**，可以用它来替代数组的长度。
+1. **const 泛型表达式：假设我们某段代码需要在内存很小的平台上工作，因此需要限制函数参数占用的内存大小，此时就可以使用 const 泛型表达式来实现**。
+    <!-- TODO 限制函数参数占用的内存大小？ -->
+<!-- // 目前只能在nightly版本下使用
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
+
+fn something<T>(val: T)
+where
+    Assert<{ core::mem::size_of::<T>() < 768 }>: IsTrue,
+    //       ^-----------------------------^ 这里是一个 const 表达式，换成其它的 const 表达式也可以
+{
+    //
+}
+
+fn main() {
+    something([0u8; 0]); // ok
+    something([0u8; 512]); // ok
+    something([0u8; 1024]); // 编译错误，数组长度是1024字节，超过了768字节的参数长度限制
+}
+
+// ---
+
+pub enum Assert<const CHECK: bool> {
+    //
+}
+
+pub trait IsTrue {
+    //
+}
+
+impl IsTrue for Assert<true> {
+    //
+} -->
+
+1. 泛型的性能：**在 Rust 中泛型是零成本的抽象，因为是一种编译期多态的实现，意味着你在使用泛型时，完全不用担心性能上的问题**，但是任何选择都是权衡得失的，既然我们获得了性能上的巨大优势，那么又失去了什么呢？**Rust 是在编译期为泛型对应的多个类型，生成各自的代码，因此损失了编译速度和增大了最终生成文件的大小**。
+1. **Rust 通过在编译时进行泛型代码的 单态化(monomorphization)来保证效率。单态化是一个通过填充编译时使用的具体类型，将通用代码转换为特定代码的过程**。也就是说编译器所做的工作正好与我们创建泛型函数的步骤相反，编译器**寻找所有泛型代码被调用的位置并针对具体类型生成代码**。
+1. 让我们看看一个使用标准库中 Option 枚举的例子。
+    ```rust
+    let integer = Some(5);
+    let float = Some(5.0);
+    ```
+    当 Rust 编译这些代码的时候，它会进行单态化。编译器会读取传递给 Option<T> 的值并发现有两种 Option<T>：一种对应 i32 另一种对应 f64。为此，它会将泛型定义 Option<T> 展开为 Option_i32 和 Option_f64，接着将泛型定义替换为这两个具体的定义。编译器生成的单态化版本的代码看起来像这样：
+    ```rust
+    enum Option_i32 {
+        Some(i32),
+        None,
+    }
+
+    enum Option_f64 {
+        Some(f64),
+        None,
+    }
+
+    fn main() {
+        let integer = Option_i32::Some(5);
+        let float = Option_f64::Some(5.0);
+    }
+    ```
+    我们可以使用泛型来编写不重复的代码，而 Rust 将会为每一个实例编译其特定类型的代码。这意味着在**使用泛型时没有运行时开销；当代码运行，它的执行效率就跟好像手写每个具体定义的重复代码一样。这个单态化过程正是 Rust 泛型在运行时极其高效的原因**。
+
 ### Trait
 
 ## Exercises
