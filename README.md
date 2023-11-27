@@ -3,6 +3,7 @@
 ## Index
 
 1. [Notes](#notes)
+    1. [Let & Const](#let--const)
     1. [Type](#type)
     1. [Expression & Statement](#expression--statement)
     1. [Function](#function)
@@ -23,6 +24,25 @@
 1. [Exercises](#exercises)
 
 ## Notes
+
+### Let & Const
+
+1. **Rust 不允许使用未初始化的变量，这会在编译时报错。可以先声明变量绑定，再初始化，不过这种用法不推荐，因为可能造成使用未初始化的变量。**
+1. 如果你创建了一个变量却不在任何地方使用它，Rust 通常会给你一个警告，因为这可能会是个 BUG。但是有时创建一个不会被使用的变量是有用的，比如你正在设计原型或刚刚开始一个项目。这时你希望告诉 Rust 不要警告未使用的变量，为此可以用下划线作为变量名的开头：
+    ```rust
+    fn main() {
+        let _x = 5;
+    }
+    ```
+1. **常量不允许使用 mut，常量不仅仅默认不可变，而且自始至终不可变，因为常量是在编译期计算完成的，使用 const 关键字且值的类型必须标注。Rust 常量的命名约定是全部字母都使用大写，并使用下划线分隔单词，另外对数字字面量可插入下划线以提高可读性。**
+    ```rust
+    const MAX_POINTS: u32 = 100_000;
+    ```
+常量可以在任意作用域内声明，**在声明的作用域内，常量在程序运行的整个过程中都有效（类似 c++ 的 static）**。对于需要在多处代码共享一个不可变的值时非常有用，例如游戏中允许玩家赚取的最大点数或光速。在实际使用中，**最好将程序中用到的硬编码值都声明为常量，对于代码后续的维护有莫大的帮助。如果将来需要更改硬编码的值，你也只需要在代码中更改一处即可**。
+1. **当你使用 const 声明一个常量时，编译器会尝试在编译时将这个常量的值内联到使用它的地方。这就是所谓的“内联优化”（inline optimization）。内联优化的含义是，编译器会尽量避免在运行时对常量进行实际的内存分配和加载操作，而是直接将常量的值嵌入到生成的机器码中。这样可以减少运行时的开销，因为不需要在运行时去读取内存中的常量值，而是直接使用已知的常量值。**  
+无论常量在哪里使用，它们本质上都是内联的，这意味着当它们被使用时，都是直接被拷贝到相关的上下文中来使用的。**在编译的时候，编译器会尽可能将其内联到代码中，所以在不同地方对同一常量的引用并不能保证引用到相同的内存地址，即对于常量并没有一个固定绑定的内存对象。**
+1. 对于变量出现重复的定义(绑定)会发生变量遮盖，后面定义的变量会遮住前面定义的变量，而对于常量则是不允许出现重复的定义的。  
+变量遮蔽的用处在于，如果你在某个作用域内无需再使用之前的变量（在被遮蔽后，无法再访问到之前的同名变量），就可以重复的使用变量名字，而不用绞尽脑汁去想更多的名字
 
 ### Type
 
@@ -298,18 +318,25 @@ Rust 的编译器一直在优化，早期的时候，引用的作用域跟变量
 
 ### String & Slice
 
+1. Rust 中的 char 可以表示 Unicode 的字符，因为需要能放下最大的字符，所以 char 类型占据 4 个字节内存空间。
 1. #![allow(unused_variables)] 属性标记，该标记会告诉编译器忽略未使用的变量，不要抛出 warning 警告。
 1. unimplemented!() 告诉编译器该函数尚未实现，unimplemented!() 标记通常意味着我们期望快速完成主要代码，回头再通过搜索这些标记来完成次要代码，类似的标记还有 todo!()，当代码执行到这种未实现的地方时，程序会直接报错。
 1. 切片：使用方括号包括的一个序列，[开始索引..终止索引]，其中开始索引是切片中第一个元素的索引位置，而终止索引是最后一个元素后面的索引位置，也就是**左闭右开**区间。在**切片数据结构内部会保存开始的位置和切片的长度**，其中长度是通过终止索引 - 开始索引的方式计算得来的。
 1. 如果你的切片想要包含 String 的最后一个字节，则可以这样使用 [idx..]，不写终止索引，同理还存在 [..idx] 甚至 [..] 的形式。
-1. 字符串中的一个字符这里指 "a啊の" 这里能选中的最小单元，比如 'a'，'啊'，'の' 这就是三个字符。
-1. 在对字符串使用切片语法时需要格外小心，切片的索引必须落在字符之间的边界位置(**Rust 中的 char 是 Unicode 类型每个字符占据 4 个字节内存空间，但是在字符串中字符串是 UTF-8 编码，这样可以减少所占空间**)，例如中文在 UTF-8 中占用三个字节，下面的代码就会崩溃：
+1. 字符串中的一个字符这里指 "a啊の" 这里能选中的最小单元，比如 'a'，'啊'，'の' 这就是三个字符。字符串按照 UTF-8 编码，这样可以减少所占空间，每个字符占据 1-4 个字节这样拼凑。
+1. 在对字符串使用切片语法时需要格外小心，切片的索引必须落在字符之间的边界位置()，因为中文在 UTF-8 中占用三个字节，所以下面的代码就会崩溃：
     ```rust
     let s = "中国人";
     let a = &s[0..2];
     println!("{}",a);
     ```
-    因为我们只取 s 字符串的前两个字节，但是本例中每个汉字占用三个字节，因此没有落在字符的边界处，也就是连第一个字符'中'字都取不完整，此时程序会直接崩溃退出，如果改成 &s[0..3]，则可以正常通过编译。
+    因为我们只取 s 字符串的前两个字节，但是本例中每个汉字占用三个字节，因此没有落在字符的边界处，也就是连第一个字符'中'字都取不完整，此时程序会直接崩溃退出，如果改成 &s[0..3]，则可以正常通过编译。  
+    **如果你想截取字符串的一部分，最好使用字符索引而不是字节索引，可以使用 .chars() 方法**，例如：
+    ```rust
+    let s = "中国人";
+    let a: String = s.chars().take(2).collect();
+    println!("{}", a);
+    ```
 1. 字符串切片的类型标识是 &str，也是字符串字面值的类型。
 1. Rust 在语言级别，只有一种字符串类型： str，它通常是以引用类型出现 &str，也就是上文提到的字符串切片。但是在标准库里，还有多种不同用途的字符串类型，其中使用最广的即是 String 类型。  
 str 类型是硬编码进可执行文件，也无法被修改，但是 String 则是一个可增长、可改变且**具有所有权**的 UTF-8 编码字符串，当 Rust 用户提到字符串时，往往指的就是 String 类型和 &str 字符串切片类型，这两个类型都是 UTF-8 编码。
@@ -2011,5 +2038,266 @@ fn main() {
     ```
 
 ### HashMap
+
+1. HashMap 中存储的是 KV 键值对，底层的数据都存储在内存堆上，然后通过一个存储在栈中的引用类型来访问，并提供了平均复杂度为 O(1) 的查询方法。
+    ```rust
+    use std::collections::HashMap;
+
+    // 创建一个HashMap，用于存储宝石种类和对应的数量
+    let mut my_gems = HashMap::new();
+
+    // 将宝石类型和对应的数量写入表中
+    my_gems.insert("红宝石", 1);
+    my_gems.insert("蓝宝石", 2);
+    my_gems.insert("河边捡的误以为是宝石的破石头", 18);
+    ```
+1. **使用 HashMap 需要手动通过 use ... 从标准库中引入到我们当前的作用域中来**，仔细回忆下，之前使用另外两个集合类型 String 和 Vec 时，我们是否有手动引用过？答案是 No，**因为 HashMap 并没有包含在 Rust 的 prelude 中（Rust 为了简化用户使用，提前将最常用的类型自动引入到作用域中）**。
+1. 如果预先知道要存储的 KV 对个数，可以使用 HashMap::with_capacity(capacity) 创建指定大小的 HashMap，避免频繁的内存分配和拷贝，提升性能。
+<!-- TODO -->
+1. 使用迭代器和 collect 方法创建
+在实际使用中，不是所有的场景都能 new 一个哈希表后，然后悠哉悠哉的依次插入对应的键值对，而是可能会从另外一个数据结构中，获取到对应的数据，最终生成 HashMap。
+
+例如考虑一个场景，有一张表格中记录了足球联赛中各队伍名称和积分的信息，这张表如果被导入到 Rust 项目中，一个合理的数据结构是 Vec<(String, u32)> 类型，该数组中的元素是一个个元组，该数据结构跟表格数据非常契合：表格中的数据都是逐行存储，每一个行都存有一个 (队伍名称, 积分) 的信息。
+
+但是在很多时候，又需要通过队伍名称来查询对应的积分，此时动态数组就不适用了，因此可以用 HashMap 来保存相关的队伍名称 -> 积分映射关系。 理想很丰满，现实很骨感，如何将 Vec<(String, u32)> 中的数据快速写入到 HashMap<String, u32> 中？
+
+一个动动脚趾头就能想到的笨方法如下：
+
+fn main() {
+    use std::collections::HashMap;
+
+    let teams_list = vec![
+        ("中国队".to_string(), 100),
+        ("美国队".to_string(), 10),
+        ("日本队".to_string(), 50),
+    ];
+
+    let mut teams_map = HashMap::new();
+    for team in &teams_list {
+        teams_map.insert(&team.0, team.1);
+    }
+
+    println!("{:?}",teams_map)
+}
+遍历列表，将每一个元组作为一对 KV 插入到 HashMap 中，很简单，但是……也不太聪明的样子，换个词说就是 —— 不够 rusty。
+
+好在，Rust 为我们提供了一个非常精妙的解决办法：先将 Vec 转为迭代器，接着通过 collect 方法，将迭代器中的元素收集后，转成 HashMap：
+
+fn main() {
+    use std::collections::HashMap;
+
+    let teams_list = vec![
+        ("中国队".to_string(), 100),
+        ("美国队".to_string(), 10),
+        ("日本队".to_string(), 50),
+    ];
+
+    let teams_map: HashMap<_,_> = teams_list.into_iter().collect();
+    
+    println!("{:?}",teams_map)
+}
+代码很简单，into_iter 方法将列表转为迭代器，接着通过 collect 进行收集，不过需要注意的是，collect 方法在内部实际上支持生成多种类型的目标集合，因此我们需要通过类型标注 HashMap<_,_> 来告诉编译器：请帮我们收集为 HashMap 集合类型，具体的 KV 类型，麻烦编译器您老人家帮我们推导。
+
+由此可见，Rust 中的编译器时而小聪明，时而大聪明，不过好在，它大聪明的时候，会自家人知道自己事，总归会通知你一声：
+
+error[E0282]: type annotations needed // 需要类型标注
+  --> src/main.rs:10:9
+   |
+10 |     let teams_map = teams_list.into_iter().collect();
+   |         ^^^^^^^^^ consider giving `teams_map` a type // 给予 `teams_map` 一个具体的类型
+
+1. 所有权转移
+HashMap 的所有权规则与其它 Rust 类型没有区别：
+
+若类型实现 Copy 特征，该类型会被复制进 HashMap，因此无所谓所有权
+若没实现 Copy 特征，所有权将被转移给 HashMap 中
+例如我参选帅气男孩时的场景再现：
+
+fn main() {
+    use std::collections::HashMap;
+
+    let name = String::from("Sunface");
+    let age = 18;
+
+    let mut handsome_boys = HashMap::new();
+    handsome_boys.insert(name, age);
+
+    println!("因为过于无耻，{}已经被从帅气男孩名单中除名", name);
+    println!("还有，他的真实年龄远远不止{}岁", age);
+}
+运行代码，报错如下：
+
+error[E0382]: borrow of moved value: `name`
+  --> src/main.rs:10:32
+   |
+4  |     let name = String::from("Sunface");
+   |         ---- move occurs because `name` has type `String`, which does not implement the `Copy` trait
+...
+8  |     handsome_boys.insert(name, age);
+   |                          ---- value moved here
+9  |
+10 |     println!("因为过于无耻，{}已经被除名", name);
+   |                                            ^^^^ value borrowed here after move
+提示很清晰，name 是 String 类型，因此它受到所有权的限制，在 insert 时，它的所有权被转移给 handsome_boys，所以最后在使用时，会遇到这个无情但是意料之中的报错。
+
+如果你使用引用类型放入 HashMap 中，请确保该引用的生命周期至少跟 HashMap 活得一样久：
+
+fn main() {
+    use std::collections::HashMap;
+
+    let name = String::from("Sunface");
+    let age = 18;
+
+    let mut handsome_boys = HashMap::new();
+    handsome_boys.insert(&name, age);
+
+    std::mem::drop(name);
+    println!("因为过于无耻，{:?}已经被除名", handsome_boys);
+    println!("还有，他的真实年龄远远不止{}岁", age);
+}
+上面代码，我们借用 name 获取了它的引用，然后插入到 handsome_boys 中，至此一切都很完美。但是紧接着，就通过 drop 函数手动将 name 字符串从内存中移除，再然后就报错了：
+
+ handsome_boys.insert(&name, age);
+   |                          ----- borrow of `name` occurs here // name借用发生在此处
+9  |
+10 |     std::mem::drop(name);
+   |                    ^^^^ move out of `name` occurs here // name的所有权被转移走
+11 |     println!("因为过于无耻，{:?}已经被除名", handsome_boys);
+   |                                              ------------- borrow later used here // 所有权转移后，还试图使用name
+最终，某人因为过于无耻，真正的被除名了 :)
+
+1. 查询 HashMap
+通过 get 方法可以获取元素：
+
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Yellow"), 50);
+
+let team_name = String::from("Blue");
+let score: Option<&i32> = scores.get(&team_name);
+上面有几点需要注意：
+
+get 方法返回一个 Option<&i32> 类型：当查询不到时，会返回一个 None，查询到时返回 Some(&i32)
+&i32 是对 HashMap 中值的借用，如果不使用借用，可能会发生所有权的转移
+还可以继续拓展下，上面的代码中，如果我们想直接获得值类型的 score 该怎么办，答案简约但不简单:
+
+let score: i32 = scores.get(&team_name).copied().unwrap_or(0);
+这里留给大家一个小作业: 去官方文档中查询下 Option 的 copied 方法和 unwrap_or 方法的含义及该如何使用。
+
+还可以通过循环的方式依次遍历 KV 对：
+
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Yellow"), 50);
+
+for (key, value) in &scores {
+    println!("{}: {}", key, value);
+}
+最终输出：
+
+
+Yellow: 50
+Blue: 10
+
+1. 更新 HashMap 中的值
+更新值的时候，涉及多种情况，咱们在代码中一一进行说明：
+
+fn main() {
+    use std::collections::HashMap;
+
+    let mut scores = HashMap::new();
+
+    scores.insert("Blue", 10);
+
+    // 覆盖已有的值
+    let old = scores.insert("Blue", 20);
+    assert_eq!(old, Some(10));
+
+    // 查询新插入的值
+    let new = scores.get("Blue");
+    assert_eq!(new, Some(&20));
+
+    // 查询Yellow对应的值，若不存在则插入新值
+    let v = scores.entry("Yellow").or_insert(5);
+    assert_eq!(*v, 5); // 不存在，插入5
+
+    // 查询Yellow对应的值，若不存在则插入新值
+    let v = scores.entry("Yellow").or_insert(50);
+    assert_eq!(*v, 5); // 已经存在，因此50没有插入
+}
+具体的解释在代码注释中已有，这里不再进行赘述。
+
+在已有值的基础上更新
+另一个常用场景如下：查询某个 key 对应的值，若不存在则插入新值，若存在则对已有的值进行更新，例如在文本中统计词语出现的次数：
+
+use std::collections::HashMap;
+
+let text = "hello world wonderful world";
+
+let mut map = HashMap::new();
+// 根据空格来切分字符串(英文单词都是通过空格切分)
+for word in text.split_whitespace() {
+    let count = map.entry(word).or_insert(0);
+    *count += 1;
+}
+
+println!("{:?}", map);
+上面代码中，新建一个 map 用于保存词语出现的次数，插入一个词语时会进行判断：若之前没有插入过，则使用该词语作 Key，插入次数 0 作为 Value，若之前插入过则取出之前统计的该词语出现的次数，对其加一。
+
+有两点值得注意：
+
+or_insert 返回了 &mut v 引用，因此可以通过该可变引用直接修改 map 中对应的值
+使用 count 引用时，需要先进行解引用 *count，否则会出现类型不匹配
+
+1. 哈希函数
+你肯定比较好奇，为何叫哈希表，到底什么是哈希。
+
+先来设想下，如果要实现 Key 与 Value 的一一对应，是不是意味着我们要能比较两个 Key 的相等性？例如 "a" 和 "b"，1 和 2，当这些类型做 Key 且能比较时，可以很容易知道 1 对应的值不会错误的映射到 2 上，因为 1 不等于 2。因此，一个类型能否作为 Key 的关键就是是否能进行相等比较，或者说该类型是否实现了 std::cmp::Eq 特征。
+
+f32 和 f64 浮点数，没有实现 std::cmp::Eq 特征，因此不可以用作 HashMap 的 Key。
+
+好了，理解完这个，再来设想一点，若一个复杂点的类型作为 Key，那怎么在底层对它进行存储，怎么使用它进行查询和比较？ 是不是很棘手？好在我们有哈希函数：通过它把 Key 计算后映射为哈希值，然后使用该哈希值来进行存储、查询、比较等操作。
+
+但是问题又来了，如何保证不同 Key 通过哈希后的两个值不会相同？如果相同，那意味着我们使用不同的 Key，却查到了同一个结果，这种明显是错误的行为。 此时，就涉及到安全性跟性能的取舍了。
+
+若要追求安全，尽可能减少冲突，同时防止拒绝服务（Denial of Service, DoS）攻击，就要使用密码学安全的哈希函数，HashMap 就是使用了这样的哈希函数。反之若要追求性能，就需要使用没有那么安全的算法。
+
+高性能三方库
+因此若性能测试显示当前标准库默认的哈希函数不能满足你的性能需求，就需要去 crates.io 上寻找其它的哈希函数实现，使用方法很简单：
+
+use std::hash::BuildHasherDefault;
+use std::collections::HashMap;
+// 引入第三方的哈希函数
+use twox_hash::XxHash64;
+
+// 指定HashMap使用第三方的哈希函数XxHash64
+let mut hash: HashMap<_, _, BuildHasherDefault<XxHash64>> = Default::default();
+hash.insert(42, "the answer");
+assert_eq!(hash.get(&42), Some(&"the answer"));
+目前，HashMap 使用的哈希函数是 SipHash，它的性能不是很高，但是安全性很高。SipHash 在中等大小的 Key 上，性能相当不错，但是对于小型的 Key （例如整数）或者大型 Key （例如字符串）来说，性能还是不够好。若你需要极致性能，例如实现算法，可以考虑这个库：ahash。
+
+最后，如果你想要了解 HashMap 更多的用法，请参见本书的标准库解析章节：HashMap 常用方法
+
+### Lifetime
+
+### Panic
+
+### Result & ?
+
+### Crate
+
+### Module
+
+### Use
+
+### Comment & Document
+
+### Format Output
 
 ## Exercises
