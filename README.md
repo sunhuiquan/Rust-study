@@ -21,6 +21,7 @@
     1. [Trait](#trait)
     1. [Vector](#vector)
     1. [HashMap](#hashmap)
+    1. [Format Output](#format-output)
 1. [Exercises](#exercises)
 
 ## Notes
@@ -2299,5 +2300,61 @@ assert_eq!(hash.get(&42), Some(&"the answer"));
 ### Comment & Document
 
 ### Format Output
+
+1. print! 将格式化文本输出到标准输出，不带换行符；println! 同上，但是在行的末尾添加换行符；**format! 将格式化文本输出到 String 字符串**。
+1. eprint!，eprintln! 使用方式跟 print!，println! 很像，但是它们**输出到标准错误**。
+1. Rust 不需要用户自己去写对应类型的占位符，**而是统一用 {} 来替代即可，剩下的类型推导等细节只要交给 Rust 去做**，非常方便。
+1. **{} 适用于实现了 std::fmt::Display 特征的类型**，用来以更优雅、更友好的方式格式化文本，例如展示给用户。
+1. **{:?} 适用于实现了 std::fmt::Debug 特征的类型**，用于调试场景，当你在写代码需要调试时，使用 {:?}，剩下的场景选择 {}。
+<!-- 1. {:#?} 与 {:?} 几乎一样，唯一的区别在于它能更优美地输出内容 // TODO:什么特征?? -->
+<!-- 1. 事实上，为了方便我们调试，大多数 Rust 类型都实现了 Debug 特征或者支持派生该特征：对于数值、字符串、数组，可以直接使用 {:?} 进行输出，但是对于结构体，需要派生Debug特征后，才能进行输出，总之很简单。// TODO: 为什么支持派生 debug，而不支持派生 display 呢
+    ```rust
+    #[derive(Debug)]
+    struct Person {
+        name: String,
+        age: u8
+    }
+    ``` -->
+1. 实现了 Display 特征的 Rust 类型并没有那么多，此时需要我们自定义想要的格式化方式。  
+**为自定义类型实现 Display 特征**
+```rust
+struct Person {
+    name: String,
+    age: u8,
+}
+
+use std::fmt;
+impl fmt::Display for Person {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "姓名{}，年龄{}", self.name, self.age)
+    }
+}
+
+fn main() {
+    let p = Person {
+        name: "sunface".to_string(),
+        age: 18,
+    };
+    println!("{}", p);
+}
+```
+**使用 newtype 为外部类型（这里指非本地定义的类型）实现 Display 特征：在 Rust 中，无法直接为外部类型实现外部特征，但是可以使用 newtype 解决此问题**
+```rust
+struct Array(Vec<i32>); // 封装一个 Vec<i32> 类型，为这个向量提供一个新的类型名字
+
+use std::fmt;
+impl fmt::Display for Array {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "数组是：{:?}", self.0)
+    }
+}
+
+fn main() {
+    let arr = Array(vec![1, 2, 3]);
+    println!("{}", arr);
+}
+```
+Array 就是我们的 newtype，它将想要格式化输出的 Vec 包裹在内，最后只要为 Array 实现 Display 特征，即可进行格式化输出。
+1. 
 
 ## Exercises
